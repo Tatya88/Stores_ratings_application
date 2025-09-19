@@ -18,6 +18,9 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
+// Make pool available to routes
+app.set('pool', pool);
+
 // ------------------- Middleware for JWT -------------------
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -186,8 +189,13 @@ app.post("/api/admin/users", authenticateToken, async (req, res) => {
   }
 });
 
+// ------------------- MOUNT ROUTES -------------------
+app.use('/api/stores', require('./routes/store'));
+app.use('/api/ratings', require('./routes/ratings'));
+app.use('/api/user', require('./routes/user'));
+
 // ------------------- START SERVER -------------------
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

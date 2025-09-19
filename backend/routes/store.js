@@ -11,7 +11,6 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-// Middleware to verify JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -24,6 +23,22 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// List all stores
+router.get("/", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT s.id, s.name, s.address, AVG(r.rating)::numeric(10,2) AS average_rating
+       FROM stores s
+       LEFT JOIN ratings r ON s.id = r.store_id
+       GROUP BY s.id, s.name, s.address`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Get stores error:", err);
+    res.status(500).json({ error: "Error fetching stores" });
+  }
+});
+
 // Store owner dashboard
 router.get("/dashboard", authenticateToken, async (req, res) => {
   if (req.user.role !== "store") {
@@ -31,17 +46,47 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get store owned by this user
-    const storeRes = await pool.query(
-      "SELECT id, name, address FROM stores WHERE owner_id = $1",
+    // Get all stores owned by this user with average rating
+    const storesRes = await pool.query(
+      `SELECT s.id, s.name, s.address, AVG(r.rating)::numeric(10,2) AS average_rating
+       FROM stores s
+       LEFT JOIN ratings r ON s.id = r.store_id
+       WHERE s.owner_id = $1
+       GROUP BY s.id, s.name, s.address`,
       [req.user.id]
     );
 
-    if (storeRes.rows.length === 0) {
-      return res.status(404).json({ error: "Store not found" });
+    if (storesRes.rows.length === 0) {
+      return res.status(404).json({ error: "No stores found" });
     }
 
-    const store = storeRes.rows[0];
+    res.json({
+      stores: storesRes.rows,
+    });
+  } catch (err) {
+    console.error("Store dashboard error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get ratings for a specific store
+router.get("/:storeId/ratings", authenticateToken, async (req, res) => {
+  if (req.user.role !== "store") {
+    return res.status(403).json({ error: "Access denied" });
+  }
+
+  const { storeId } = req.params;
+
+  try {
+    // Check if the store belongs to the user
+    const storeCheck = await pool.query(
+      "SELECT id FROM stores WHERE id = $1 AND owner_id = $2",
+      [storeId, req.user.id]
+    );
+
+    if (storeCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Store not found" });
+    }
 
     // Get ratings for the store
     const ratingsRes = await pool.query(
@@ -49,21 +94,14 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
        FROM ratings r
        JOIN users u ON r.user_id = u.id
        WHERE r.store_id = $1`,
-      [store.id]
-    );
-
-    // Average rating
-    const avgRes = await pool.query(
-      "SELECT AVG(rating)::numeric(10,2) AS avg FROM ratings WHERE store_id = $1",
-      [store.id]
+      [storeId]
     );
 
     res.json({
-      store: { ...store, average_rating: avgRes.rows[0].avg || null },
       ratings: ratingsRes.rows,
     });
   } catch (err) {
-    console.error("Store dashboard error:", err);
+    console.error("Get store ratings error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

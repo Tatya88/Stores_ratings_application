@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { Pool } = require("pg");
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const { Pool } = require("pg");
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -12,7 +12,6 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-// Middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -53,6 +52,21 @@ router.post("/update-password", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("Update password error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get current user's ratings
+router.get("/ratings", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const result = await pool.query(
+      "SELECT store_id, rating FROM ratings WHERE user_id = $1",
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Get user ratings error:", err);
+    res.status(500).json({ error: "Failed to fetch user ratings" });
   }
 });
 

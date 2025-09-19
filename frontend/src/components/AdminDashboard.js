@@ -3,7 +3,7 @@ import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5001/api';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -29,7 +29,6 @@ const AdminDashboard = () => {
         setError('');
         const headers = { Authorization: `Bearer ${token}` };
 
-        // 1. Get profile & check role
         const profileRes = await axios.get(`${API_BASE_URL}/auth/profile`, { headers });
         const userRole = profileRes.data.role;
         setRole(userRole);
@@ -39,15 +38,12 @@ const AdminDashboard = () => {
           return;
         }
 
-        // 2. Dashboard stats
         const dashboardRes = await axios.get(`${API_BASE_URL}/admin/dashboard`, { headers });
         setStats(dashboardRes.data);
 
-        // 3. All users
         const usersRes = await axios.get(`${API_BASE_URL}/admin/users`, { headers });
         setUsers(usersRes.data);
 
-        // 4. All stores
         const storesRes = await axios.get(`${API_BASE_URL}/admin/stores`, { headers });
         setStores(storesRes.data);
 

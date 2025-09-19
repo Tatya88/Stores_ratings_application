@@ -1,9 +1,30 @@
 const express = require("express");
 const router = express.Router();
+const jwt = require("jsonwebtoken");
+const { Pool } = require("pg");
+
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+});
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Token missing" });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: "Invalid token" });
+    req.user = user;
+    next();
+  });
+};
 
 // Submit or modify rating
-router.post("/", async (req, res) => {
-  const pool = req.pool;
+router.post("/", authenticateToken, async (req, res) => {
   const { store_id, rating } = req.body;
   const user_id = req.user.id;
 
